@@ -108,25 +108,24 @@ padding = 0.3
 input_size = [256,192]
 _aspect_ratio = float(input_size[1]) / input_size[0]
 
-def test_transform(self, src, bbox):
-        xmin, ymin, xmax, ymax = bbox
-        center, scale = _box_to_center_scale(
-            xmin, ymin, xmax - xmin, ymax - ymin, _aspect_ratio)
-        scale = scale * 1.0
+def test_transform(src, bbox):
+    xmin, ymin, xmax, ymax = bbox
+    center, scale = _box_to_center_scale(
+        xmin, ymin, xmax - xmin, ymax - ymin, _aspect_ratio)
+    scale = scale * 1.0
 
-        input_size = self._input_size
-        inp_h, inp_w = input_size
+    inp_h, inp_w = input_size
 
-        trans = get_affine_transform(center, scale, 0, [inp_w, inp_h])
-        img = cv2.warpAffine(src, trans, (int(inp_w), int(inp_h)), flags=cv2.INTER_LINEAR)
-        bbox = _center_scale_to_box(center, scale)
+    trans = get_affine_transform(center, scale, 0, [inp_w, inp_h])
+    img = cv2.warpAffine(src, trans, (int(inp_w), int(inp_h)), flags=cv2.INTER_LINEAR)
+    bbox = _center_scale_to_box(center, scale)
 
-        img = im_to_torch(img)
-        img[0].add_(-0.406)
-        img[1].add_(-0.457)
-        img[2].add_(-0.480)
+    img = im_to_torch(img)
+    img[0].add_(-0.406)
+    img[1].add_(-0.457)
+    img[2].add_(-0.480)
 
-        return img, bbox
+    return img, bbox
 
 def get_mediapipe_bbox(frame,cheat_size):
     def _get_output(boxes):
@@ -136,7 +135,7 @@ def get_mediapipe_bbox(frame,cheat_size):
             inps[i], cropped_box = test_transform(orig_img, box)
             cropped_boxes[i] = torch.FloatTensor(cropped_box)
 
-        return inps, torch.cat(bboxes), cropped_boxes
+        return inps, bboxes, cropped_boxes # torch.cat(bboxes)
     with mp_hands.Hands(
         static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5
     ) as hands:
@@ -331,10 +330,11 @@ if __name__ == "__main__":
                     ckpt_time, det_time = getTime(start_time)
                     runtime_profile['dt'].append(det_time)
                 # Pose Estimation
-                print("boxes", boxes)
-                print("cropped boxes", cropped_boxes)
-                print("inps", inps)
+                # print("boxes", boxes)
+                # print("cropped boxes", cropped_boxes)
+                # print("inps", inps)
                 inps = inps.to(args.device)
+                m_inps = m_inps.to(args.device)
                 datalen = inps.size(0)
                 leftover = 0
                 if (datalen) % batchSize:
@@ -349,6 +349,7 @@ if __name__ == "__main__":
                         m_inps_j = torch.cat((m_inps_j, flip(m_inps_j)))
                     # hm_j = pose_model(inps_j)
                     hm_j = pose_model(m_inps_j)
+                    print("got hm_j")
                     if args.flip:
                         hm_j_flip = flip_heatmap(hm_j[int(len(hm_j) / 2):], pose_dataset.joint_pairs, shift=True)
                         hm_j = (hm_j[0:int(len(hm_j) / 2)] + hm_j_flip) / 2
