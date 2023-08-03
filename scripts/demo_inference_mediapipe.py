@@ -131,68 +131,66 @@ def get_mediapipe_bbox(frame,cheat_size):
     def _get_output(boxes):
         inps = torch.zeros(cheat_size, 3, *input_size)
         cropped_boxes = torch.zeros(cheat_size, 4)
+        boxes = torch.cat([torch.tensor(boxes)],dim=0)
         for i, box in enumerate(boxes):
             inps[i], cropped_box = test_transform(orig_img, box)
             cropped_boxes[i] = torch.FloatTensor(cropped_box)
 
-        return inps, bboxes, cropped_boxes # torch.cat(bboxes)
-    with mp_hands.Hands(
-        static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5
-    ) as hands:
-        bboxes = []
-        image = cv2.flip(frame, 1)
-        # Convert the BGR image to RGB before processing.
-        results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        return inps, boxes, cropped_boxes# torch.cat(bboxes)
+    hands = mp_hands.Hands(static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5) 
+    bboxes = []
+    image = cv2.flip(frame, 1)
+    # Convert the BGR image to RGB before processing.
+    results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    image_height, image_width, _ = image.shape
+    handmark = []
+    if not results.multi_handedness:
+        img_sqr = [0, 0, image_width, image_height]
+        if image_width < image_height:
+            img_sqr[1] = image_width/4
+            img_sqr[3] = image_width
+        else:
+            img_sqr[0] = image_height/4
+            img_sqr[2] = image_height
+        bboxes.append(img_sqr)
+        return _get_output(bboxes)
 
-        image_height, image_width, _ = image.shape
-        if not results.multi_handedness:
-            img_sqr = [0, 0, image_width, image_height]
-            if image_width < image_height:
-                img_sqr[1] = image_width/4
-                img_sqr[3] = image_width
-            else:
-                img_sqr[0] = image_height/4
-                img_sqr[2] = image_height
-            bboxes.append(img_sqr)
-            return _get_output(bboxes)
-
-        if not results.multi_hand_landmarks:
-            return torch.tensor([[0,0,0,0]])
-        image_height, image_width, _ = image.shape
-        landmarks = results.multi_hand_landmarks[0].landmark
-        for landmark in landmarks:
-            bboxes.append([landmark.x * image_width, landmark.y * image_height])
-
+    print("results",results.multi_hand_landmarks)
+    if results.multi_hand_landmarks:
+        for handLms in results.multi_hand_landmarks:
+            for x_y in handLms.landmark:
+                handmark.append([x_y.x * image_width, x_y.y * image_height])
         # Calculate bounding box
-        bboxes = np.array(bboxes)
-        bbox_min = bboxes.min(0)
-        bbox_max = bboxes.max(0)
-        bbox_size = bbox_max - bbox_min
+        print("orinigal handmark",handmark)
+        handmark = np.array(handmark)
+        handmark_min = handmark.min(0)
+        handmark_max = handmark.max(0)
+        handmark_size = handmark_max - handmark_min
 
         # Pad hand bounding box
-        bbox_min -= bbox_size * padding
-        bbox_max += bbox_size * padding
-        bbox_size = bbox_max - bbox_min
+        handmark_min -= handmark_size * padding
+        handmark_max += handmark_size * padding
+        handmark_size = handmark_max - handmark_min
 
-        # Convert bbox to square of length equal
-        # to longer edge
-        diff = bbox_size[0] - bbox_size[1]
+        # Convert bbox to square of length equal to longer edge
+        diff = handmark_size[0] - handmark_size[1]
         if diff > 0:
-            bbox_min[1] -= diff / 2
-            bbox_max[1] += diff / 2
-            bbox_size[1] = bbox_size[0]
+            handmark_min[1] -= diff / 2
+            handmark_max[1] += diff / 2
+            handmark_size[1] = handmark_size[0]
         else:
-            bbox_min[0] -= -diff / 2
-            bbox_max[0] += -diff / 2
-            bbox_size[0] = bbox_size[1]
-
+            handmark_min[0] -= -diff / 2
+            handmark_max[0] += -diff / 2
+            handmark_size[0] = handmark_size[1]
         # Flip
-        tmp = bbox_min[0]
-        bbox_min[0] = image_width - bbox_max[0]
-        bbox_max[0] = image_width - tmp
+        tmp = handmark_min[0]
+        handmark_min[0] = image_width - handmark_max[0]
+        handmark_max[0] = image_width - tmp
         image = cv2.flip(image, 1)
 
-        bboxes.append([*bbox_min, *bbox_size])
+        bboxes.append([*handmark_min,*handmark_max])
+        print("got bboxes",bboxes)
+        breakpoint()
         return _get_output(bboxes)
 
 def check_input():
@@ -330,9 +328,9 @@ if __name__ == "__main__":
                     ckpt_time, det_time = getTime(start_time)
                     runtime_profile['dt'].append(det_time)
                 # Pose Estimation
-                # print("boxes", boxes)
-                # print("cropped boxes", cropped_boxes)
-                # print("inps", inps)
+                print("boxes", m_boxes, boxes)
+                print("cropped boxes", m_cropped_boxes)
+                print("inps", m_inps)
                 inps = inps.to(args.device)
                 m_inps = m_inps.to(args.device)
                 datalen = inps.size(0)
@@ -361,7 +359,8 @@ if __name__ == "__main__":
                 if args.pose_track:
                     boxes,scores,ids,hm,cropped_boxes = track(tracker,args,orig_img,inps,boxes,hm,cropped_boxes,im_name,scores)
                 hm = hm.cpu()
-                writer.save(boxes, scores, ids, hm, cropped_boxes, orig_img, im_name)
+                print("ready to write")
+                writer.save(m_boxes, scores, ids, hm, m_cropped_boxes, orig_img, im_name)
                 if args.profile:
                     ckpt_time, post_time = getTime(ckpt_time)
                     runtime_profile['pn'].append(post_time)
@@ -401,4 +400,3 @@ if __name__ == "__main__":
 
 
     
-
