@@ -262,7 +262,6 @@ class DetectionLoader():
                     continue
                 inps = torch.zeros(boxes_k.size(0), 3, *self._input_size)
                 cropped_boxes = torch.zeros(boxes_k.size(0), 4)
-
                 self.wait_and_put(self.det_queue, (orig_imgs[k], im_names[k], boxes_k, scores[dets[:, 0] == k], ids[dets[:, 0] == k], inps, cropped_boxes))
 
     def image_postprocess(self):

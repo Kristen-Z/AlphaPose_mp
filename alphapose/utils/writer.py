@@ -162,7 +162,6 @@ class DataWriter():
                     'result': _result
                 }
 
-
                 if self.opt.pose_flow:
                     poseflow_result = self.pose_flow_wrapper.step(orig_img, result)
                     for i in range(len(poseflow_result)):

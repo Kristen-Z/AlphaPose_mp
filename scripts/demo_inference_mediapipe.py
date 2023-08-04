@@ -127,71 +127,79 @@ def test_transform(src, bbox):
 
     return img, bbox
 
-def get_mediapipe_bbox(frame,cheat_size):
-    def _get_output(boxes):
-        inps = torch.zeros(cheat_size, 3, *input_size)
-        cropped_boxes = torch.zeros(cheat_size, 4)
-        boxes = torch.cat([torch.tensor(boxes)],dim=0)
+def get_mediapipe_bbox(frame):
+    def _get_output(boxes, scores):
+        ids = torch.zeros((len(scores), len(scores[0])))
+        inps = torch.zeros(len(boxes), 3, *input_size)
+        cropped_boxes = torch.zeros(len(boxes), 4)
         for i, box in enumerate(boxes):
-            inps[i], cropped_box = test_transform(orig_img, box)
+            inps[i], cropped_box = test_transform(frame, box)
             cropped_boxes[i] = torch.FloatTensor(cropped_box)
 
-        return inps, boxes, cropped_boxes# torch.cat(bboxes)
-    hands = mp_hands.Hands(static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5) 
-    bboxes = []
-    image = cv2.flip(frame, 1)
-    # Convert the BGR image to RGB before processing.
-    results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    image_height, image_width, _ = image.shape
-    handmark = []
-    if not results.multi_handedness:
-        img_sqr = [0, 0, image_width, image_height]
-        if image_width < image_height:
-            img_sqr[1] = image_width/4
-            img_sqr[3] = image_width
-        else:
-            img_sqr[0] = image_height/4
-            img_sqr[2] = image_height
-        bboxes.append(img_sqr)
-        return _get_output(bboxes)
+        return torch.Tensor(inps), torch.Tensor(boxes), torch.Tensor(cropped_boxes), torch.Tensor(scores), torch.Tensor(ids)
 
-    print("results",results.multi_hand_landmarks)
-    if results.multi_hand_landmarks:
-        for handLms in results.multi_hand_landmarks:
-            for x_y in handLms.landmark:
-                handmark.append([x_y.x * image_width, x_y.y * image_height])
+    bboxes = []
+    scores = []
+    with mp_hands.Hands(
+        static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5
+    ) as hands:
+        bbox = []
+        image = cv2.flip(frame, 1)
+        # Convert the BGR image to RGB before processing.
+        results = hands.process(image)
+
+        image_height, image_width, _ = image.shape
+        if not results.multi_handedness:
+            img_sqr = [0, 0, image_width, image_height]
+            if image_width < image_height:
+                img_sqr[1] = image_width/4
+                img_sqr[3] = image_width
+            else:
+                img_sqr[0] = image_height/4
+                img_sqr[2] = image_height
+            bboxes.append(img_sqr)
+            scores.append([0.0])
+            return _get_output(bboxes)
+
+        scores.append([results.multi_handedness[0].classification[0].score])
+        if not results.multi_hand_landmarks:
+            return torch.tensor([[0,0,0,0]])
+        image_height, image_width, _ = image.shape
+        landmarks = results.multi_hand_landmarks[0].landmark
+        for landmark in landmarks:
+            bbox.append([landmark.x * image_width, landmark.y * image_height])
+
         # Calculate bounding box
-        print("orinigal handmark",handmark)
-        handmark = np.array(handmark)
-        handmark_min = handmark.min(0)
-        handmark_max = handmark.max(0)
-        handmark_size = handmark_max - handmark_min
+        bbox = np.array(bbox)
+        bbox_min = bbox.min(0)
+        bbox_max = bbox.max(0)
+        bbox_size = bbox_max - bbox_min
 
         # Pad hand bounding box
-        handmark_min -= handmark_size * padding
-        handmark_max += handmark_size * padding
-        handmark_size = handmark_max - handmark_min
+        bbox_min -= bbox_size * padding
+        bbox_max += bbox_size * padding
+        bbox_size = bbox_max - bbox_min
 
-        # Convert bbox to square of length equal to longer edge
-        diff = handmark_size[0] - handmark_size[1]
+        # Convert bbox to square of length equal
+        # to longer edge
+        diff = bbox_size[0] - bbox_size[1]
         if diff > 0:
-            handmark_min[1] -= diff / 2
-            handmark_max[1] += diff / 2
-            handmark_size[1] = handmark_size[0]
+            bbox_min[1] -= diff / 2
+            bbox_max[1] += diff / 2
+            bbox_size[1] = bbox_size[0]
         else:
-            handmark_min[0] -= -diff / 2
-            handmark_max[0] += -diff / 2
-            handmark_size[0] = handmark_size[1]
+            bbox_min[0] -= -diff / 2
+            bbox_max[0] += -diff / 2
+            bbox_size[0] = bbox_size[1]
+
         # Flip
-        tmp = handmark_min[0]
-        handmark_min[0] = image_width - handmark_max[0]
-        handmark_max[0] = image_width - tmp
+        tmp = bbox_min[0]
+        bbox_min[0] = image_width - bbox_max[0]
+        bbox_max[0] = image_width - tmp
         image = cv2.flip(image, 1)
 
-        bboxes.append([*handmark_min,*handmark_max])
-        print("got bboxes",bboxes)
-        breakpoint()
-        return _get_output(bboxes)
+        bboxes.append([*bbox_min, *bbox_max])
+        return _get_output(bboxes, scores)
 
 def check_input():
     # for wecam
@@ -318,7 +326,16 @@ if __name__ == "__main__":
             with torch.no_grad():
                 (inps, orig_img, im_name, boxes, scores, ids, cropped_boxes) = det_loader.read()
                 cheat_size = inps.size(0)
-                m_inps, m_boxes, m_cropped_boxes = get_mediapipe_bbox(orig_img,cheat_size)
+                print("ap bbox: ", boxes)
+                # print("ap scores: ", scores)
+                # print("ap inps: ", inps.shape)
+                # print("ap ids: ", ids)
+                # print("ap cropped boxes: ", cropped_boxes)
+                m_inps, m_boxes, m_cropped_boxes, m_scores, m_ids = get_mediapipe_bbox(orig_img)
+                print("mp bbox: ", m_boxes)
+                # print("mp scores: ", m_scores)
+                # print("mp inps: ", m_inps)
+                # print("mp cropped boxes: ", m_cropped_boxes)
                 if orig_img is None:
                     break
                 if boxes is None or boxes.nelement() == 0:
@@ -328,9 +345,15 @@ if __name__ == "__main__":
                     ckpt_time, det_time = getTime(start_time)
                     runtime_profile['dt'].append(det_time)
                 # Pose Estimation
-                print("boxes", m_boxes, boxes)
-                print("cropped boxes", m_cropped_boxes)
-                print("inps", m_inps)
+                # print("boxes", boxes)
+                # print("cropped boxes", cropped_boxes)
+                # print("inps", inps)
+
+                # inps_img = np.swapaxes(inps[0].numpy(), 0, -1) * 255
+                # cv2.imwrite("/users/axing2/data/axing2/alphapose_mp/output/mediapipe/vis/inps.png", cv2.cvtColor(inps_img, cv2.COLOR_RGB2BGR))
+                # m_inps_img = np.swapaxes(m_inps[0].numpy(), 0, -1) * 255
+                # cv2.imwrite("/users/axing2/data/axing2/alphapose_mp/output/mediapipe/vis/m_inps.png", cv2.cvtColor(m_inps_img, cv2.COLOR_RGB2BGR))
+
                 inps = inps.to(args.device)
                 m_inps = m_inps.to(args.device)
                 datalen = inps.size(0)
@@ -347,7 +370,6 @@ if __name__ == "__main__":
                         m_inps_j = torch.cat((m_inps_j, flip(m_inps_j)))
                     # hm_j = pose_model(inps_j)
                     hm_j = pose_model(m_inps_j)
-                    print("got hm_j")
                     if args.flip:
                         hm_j_flip = flip_heatmap(hm_j[int(len(hm_j) / 2):], pose_dataset.joint_pairs, shift=True)
                         hm_j = (hm_j[0:int(len(hm_j) / 2)] + hm_j_flip) / 2
@@ -359,8 +381,8 @@ if __name__ == "__main__":
                 if args.pose_track:
                     boxes,scores,ids,hm,cropped_boxes = track(tracker,args,orig_img,inps,boxes,hm,cropped_boxes,im_name,scores)
                 hm = hm.cpu()
-                print("ready to write")
-                writer.save(m_boxes, scores, ids, hm, m_cropped_boxes, orig_img, im_name)
+                # writer.save(boxes, scores, ids, hm, cropped_boxes, orig_img, im_name)
+                writer.save(m_boxes, m_scores, m_ids, hm, cropped_boxes, orig_img, im_name)
                 if args.profile:
                     ckpt_time, post_time = getTime(ckpt_time)
                     runtime_profile['pn'].append(post_time)
@@ -400,3 +422,4 @@ if __name__ == "__main__":
 
 
     
+
