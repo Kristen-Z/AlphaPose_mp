@@ -446,7 +446,6 @@ def pose_nms_fullbody(bboxes, bbox_scores, bbox_ids, pose_preds, pose_scores, ar
         res_pose_scores.append(merge_score)
         res_pick_ids.append(pick[j])
 
-
     return res_bboxes, res_bbox_scores, res_bbox_ids, res_pose_preds, res_pose_scores, res_pick_ids
 
 
@@ -681,6 +680,7 @@ def write_json(all_results, outputpath, form=None, for_eval=False, outputfile='a
                 keypoints.append(float(kp_preds[n, 0]))
                 keypoints.append(float(kp_preds[n, 1]))
                 keypoints.append(float(kp_scores[n]))
+
             result['keypoints'] = keypoints
             result['score'] = float(pro_scores)
             if 'box' in human.keys():
@@ -719,7 +719,8 @@ def write_json(all_results, outputpath, form=None, for_eval=False, outputfile='a
                 result['keypoints'].append((result['keypoints'][15]+result['keypoints'][18])/2)
                 result['keypoints'].append((result['keypoints'][16]+result['keypoints'][19])/2)
                 result['keypoints'].append((result['keypoints'][17]+result['keypoints'][20])/2)
-                indexarr=[0,51,18,24,30,15,21,27,36,42,48,33,39,45,6,3,12,9]
+                # saves the right hand keypoints
+                indexarr=range(115*3, 136*3, 3) # [0,51,18,24,30,15,21,27,36,42,48,33,39,45,6,3,12,9] original body keypoints
                 for i in indexarr:
                     tmp['pose_keypoints_2d'].append(result['keypoints'][i])
                     tmp['pose_keypoints_2d'].append(result['keypoints'][i+1])
