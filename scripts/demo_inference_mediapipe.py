@@ -111,7 +111,7 @@ _aspect_ratio = float(input_size[1]) / input_size[0]
 def test_transform(src, bbox):
     xmin, ymin, xmax, ymax = bbox
     center, scale = _box_to_center_scale(
-        xmin, ymin, xmax - xmin, ymax - ymin, _aspect_ratio)
+        xmin, ymin, xmax - xmin, ymax - ymin)
     scale = scale * 1.0
 
     inp_h, inp_w = input_size
@@ -145,7 +145,6 @@ def get_mediapipe_bbox(frame):
     ) as hands:
         bbox = []
         image = cv2.flip(frame, 1)
-        # Convert the BGR image to RGB before processing.
         results = hands.process(image)
 
         image_height, image_width, _ = image.shape
@@ -325,16 +324,15 @@ if __name__ == "__main__":
             start_time = getTime()
             with torch.no_grad():
                 (inps, orig_img, im_name, boxes, scores, ids, cropped_boxes) = det_loader.read()
-                cheat_size = inps.size(0)
-                print("ap bbox: ", boxes)
+                # print("ap bbox: ", boxes)
                 # print("ap scores: ", scores)
                 # print("ap inps: ", inps.shape)
                 # print("ap ids: ", ids)
                 # print("ap cropped boxes: ", cropped_boxes)
                 m_inps, m_boxes, m_cropped_boxes, m_scores, m_ids = get_mediapipe_bbox(orig_img)
-                print("mp bbox: ", m_boxes)
+                # print("mp bbox: ", m_boxes)
                 # print("mp scores: ", m_scores)
-                # print("mp inps: ", m_inps)
+                # print("mp inps: ", m_inps.shape)
                 # print("mp cropped boxes: ", m_cropped_boxes)
                 if orig_img is None:
                     break
@@ -345,10 +343,6 @@ if __name__ == "__main__":
                     ckpt_time, det_time = getTime(start_time)
                     runtime_profile['dt'].append(det_time)
                 # Pose Estimation
-                # print("boxes", boxes)
-                # print("cropped boxes", cropped_boxes)
-                # print("inps", inps)
-
                 # inps_img = np.swapaxes(inps[0].numpy(), 0, -1) * 255
                 # cv2.imwrite("/users/axing2/data/axing2/alphapose_mp/output/mediapipe/vis/inps.png", cv2.cvtColor(inps_img, cv2.COLOR_RGB2BGR))
                 # m_inps_img = np.swapaxes(m_inps[0].numpy(), 0, -1) * 255
@@ -382,7 +376,7 @@ if __name__ == "__main__":
                     boxes,scores,ids,hm,cropped_boxes = track(tracker,args,orig_img,inps,boxes,hm,cropped_boxes,im_name,scores)
                 hm = hm.cpu()
                 # writer.save(boxes, scores, ids, hm, cropped_boxes, orig_img, im_name)
-                writer.save(m_boxes, m_scores, m_ids, hm, cropped_boxes, orig_img, im_name)
+                writer.save(m_boxes, m_scores, m_ids, hm, m_cropped_boxes, orig_img, im_name)
                 if args.profile:
                     ckpt_time, post_time = getTime(ckpt_time)
                     runtime_profile['pn'].append(post_time)
