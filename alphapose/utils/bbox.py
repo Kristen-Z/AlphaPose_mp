@@ -212,7 +212,6 @@ def _box_to_center_scale(x, y, w, h, aspect_ratio=1.0, scale_mult=1.25):
     if center[0] != -1:
         scale = scale * scale_mult
 
-    print(f"center: {center}, scale: {scale}")
     return center, scale
 
 

@@ -327,17 +327,10 @@ if __name__ == "__main__":
         for i in im_names_desc:
             start_time = getTime()
             with torch.no_grad():
-                (inps, orig_img, im_name, boxes, scores, ids, cropped_boxes) = det_loader.read()
-                # print("ap bbox: ", boxes)
-                # print("ap scores: ", scores)
-                # print("ap inps: ", inps.shape)
-                # print("ap ids: ", ids)
-                # print("ap cropped boxes: ", cropped_boxes)
+                # (inps, orig_img, im_name, boxes, scores, ids, cropped_boxes) = det_loader.read()
+                im_name = input_source[i]
+                orig_img = cv2.cvtColor(cv2.imread(os.path.join(args.inputpath, im_name)), cv2.COLOR_BGR2RGB)
                 m_inps, m_boxes, m_cropped_boxes, m_scores, m_ids = get_mediapipe_bbox(orig_img)
-                # print("mp bbox: ", m_boxes)
-                # print("mp scores: ", m_scores)
-                # print("mp inps: ", m_inps.shape)
-                # print("mp cropped boxes: ", m_cropped_boxes)
                 if orig_img is None:
                     break
                 if m_boxes is None:
@@ -347,11 +340,6 @@ if __name__ == "__main__":
                     ckpt_time, det_time = getTime(start_time)
                     runtime_profile['dt'].append(det_time)
                 # Pose Estimation
-                # inps_img = np.swapaxes(inps[0].numpy(), 0, -1) * 255
-                # cv2.imwrite("/users/axing2/data/axing2/alphapose_mp/output/mediapipe/vis/inps.png", cv2.cvtColor(inps_img, cv2.COLOR_RGB2BGR))
-                # m_inps_img = np.swapaxes(m_inps[0].numpy(), 0, -1) * 255
-                # cv2.imwrite("/users/axing2/data/axing2/alphapose_mp/output/mediapipe/vis/m_inps.png", cv2.cvtColor(m_inps_img, cv2.COLOR_RGB2BGR))
-
                 # inps = inps.to(args.device)
                 m_inps = m_inps.to(args.device)
                 datalen = m_inps.size(0)
