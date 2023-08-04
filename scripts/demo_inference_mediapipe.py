@@ -132,6 +132,10 @@ def get_mediapipe_bbox(frame):
         ids = torch.zeros((len(scores), len(scores[0])))
         inps = torch.zeros(len(boxes), 3, *input_size)
         cropped_boxes = torch.zeros(len(boxes), 4)
+        if frame is None:
+            return None, None, None, None, None
+        if boxes is None:
+            return None, boxes, None, scores, ids
         for i, box in enumerate(boxes):
             inps[i], cropped_box = test_transform(frame, box)
             cropped_boxes[i] = torch.FloatTensor(cropped_box)
@@ -158,7 +162,7 @@ def get_mediapipe_bbox(frame):
                 img_sqr[2] = image_height
             bboxes.append(img_sqr)
             scores.append([0.0])
-            return _get_output(bboxes)
+            return _get_output(bboxes,scores)
 
         scores.append([results.multi_handedness[0].classification[0].score])
         if not results.multi_hand_landmarks:
@@ -336,7 +340,7 @@ if __name__ == "__main__":
                 # print("mp cropped boxes: ", m_cropped_boxes)
                 if orig_img is None:
                     break
-                if boxes is None or boxes.nelement() == 0:
+                if m_boxes is None:
                     writer.save(None, None, None, None, None, orig_img, im_name)
                     continue
                 if args.profile:
@@ -348,19 +352,19 @@ if __name__ == "__main__":
                 # m_inps_img = np.swapaxes(m_inps[0].numpy(), 0, -1) * 255
                 # cv2.imwrite("/users/axing2/data/axing2/alphapose_mp/output/mediapipe/vis/m_inps.png", cv2.cvtColor(m_inps_img, cv2.COLOR_RGB2BGR))
 
-                inps = inps.to(args.device)
+                # inps = inps.to(args.device)
                 m_inps = m_inps.to(args.device)
-                datalen = inps.size(0)
+                datalen = m_inps.size(0)
                 leftover = 0
                 if (datalen) % batchSize:
                     leftover = 1
                 num_batches = datalen // batchSize + leftover
                 hm = []
                 for j in range(num_batches):
-                    inps_j = inps[j * batchSize:min((j + 1) * batchSize, datalen)]
+                    # inps_j = inps[j * batchSize:min((j + 1) * batchSize, datalen)]
                     m_inps_j = m_inps[j * batchSize:min((j + 1) * batchSize, datalen)]
                     if args.flip:
-                        inps_j = torch.cat((inps_j, flip(inps_j)))
+                        # inps_j = torch.cat((inps_j, flip(inps_j)))
                         m_inps_j = torch.cat((m_inps_j, flip(m_inps_j)))
                     # hm_j = pose_model(inps_j)
                     hm_j = pose_model(m_inps_j)
