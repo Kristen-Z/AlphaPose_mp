@@ -3,6 +3,7 @@ import argparse
 import os
 import platform
 import sys
+sys.path.append("/users/axing2/data/axing2/hand-pose/AlphaPose_mp") # path to alpha pose directory
 import time
 
 import numpy as np
@@ -269,15 +270,15 @@ if __name__ == "__main__":
         os.makedirs(args.outputpath)
 
     # Load detection loader
-    if mode == 'webcam':
-        det_loader = WebCamDetectionLoader(input_source, get_detector(args), cfg, args)
-        det_worker = det_loader.start()
-    elif mode == 'detfile':
-        det_loader = FileDetectionLoader(input_source, cfg, args)
-        det_worker = det_loader.start()
-    else:
-        det_loader = DetectionLoader(input_source, get_detector(args), cfg, args, batchSize=args.detbatch, mode=mode, queueSize=args.qsize)
-        det_worker = det_loader.start()
+    # if mode == 'webcam':
+    #     det_loader = WebCamDetectionLoader(input_source, get_detector(args), cfg, args)
+    #     det_worker = det_loader.start()
+    # elif mode == 'detfile':
+    #     det_loader = FileDetectionLoader(input_source, cfg, args)
+    #     det_worker = det_loader.start()
+    # else:
+    #     det_loader = DetectionLoader(input_source, get_detector(args), cfg, args, batchSize=args.detbatch, mode=mode, queueSize=args.qsize)
+    #     det_worker = det_loader.start()
 
     # Load pose model
     pose_model = builder.build_sppe(cfg.MODEL, preset_cfg=cfg.DATA_PRESET)
@@ -301,24 +302,24 @@ if __name__ == "__main__":
 
     # Init data writer
     queueSize = 2 if mode == 'webcam' else args.qsize
-    if args.save_video and mode != 'image':
-        from alphapose.utils.writer import DEFAULT_VIDEO_SAVE_OPT as video_save_opt
-        if mode == 'video':
-            video_save_opt['savepath'] = os.path.join(args.outputpath, 'AlphaPose_' + os.path.basename(input_source))
-        else:
-            video_save_opt['savepath'] = os.path.join(args.outputpath, 'AlphaPose_webcam' + str(input_source) + '.mp4')
-        video_save_opt.update(det_loader.videoinfo)
-        writer = DataWriter(cfg, args, save_video=True, video_save_opt=video_save_opt, queueSize=queueSize).start()
-    else:
-        writer = DataWriter(cfg, args, save_video=False, queueSize=queueSize).start()
+    # if args.save_video and mode != 'image':
+    #     from alphapose.utils.writer import DEFAULT_VIDEO_SAVE_OPT as video_save_opt
+    #     if mode == 'video':
+    #         video_save_opt['savepath'] = os.path.join(args.outputpath, 'AlphaPose_' + os.path.basename(input_source))
+    #     else:
+    #         video_save_opt['savepath'] = os.path.join(args.outputpath, 'AlphaPose_webcam' + str(input_source) + '.mp4')
+    #     video_save_opt.update(det_loader.videoinfo)
+    #     writer = DataWriter(cfg, args, save_video=True, video_save_opt=video_save_opt, queueSize=queueSize).start()
+    # else:
+    writer = DataWriter(cfg, args, save_video=False, queueSize=queueSize).start()
 
-    if mode == 'webcam':
-        print('Starting webcam demo, press Ctrl + C to terminate...')
-        sys.stdout.flush()
-        im_names_desc = tqdm(loop())
-    else:
-        data_len = det_loader.length
-        im_names_desc = tqdm(range(data_len), dynamic_ncols=True)
+    # if mode == 'webcam':
+    #     print('Starting webcam demo, press Ctrl + C to terminate...')
+    #     sys.stdout.flush()
+    #     im_names_desc = tqdm(loop())
+    # else:
+    data_len = len(input_source) # det_loader.length
+    im_names_desc = tqdm(range(data_len), dynamic_ncols=True)
 
     batchSize = args.posebatch
     if args.flip:
@@ -384,7 +385,7 @@ if __name__ == "__main__":
             time.sleep(1)
             print('===========================> Rendering remaining ' + str(writer.count()) + ' images in the queue...', end='\r')
         writer.stop()
-        det_loader.stop()
+        # det_loader.stop()
     except Exception as e:
         print(repr(e))
         print('An error as above occurs when processing the images, please check it')
@@ -393,7 +394,7 @@ if __name__ == "__main__":
         print_finish_info()
         # Thread won't be killed when press Ctrl+C
         if args.sp:
-            det_loader.terminate()
+            # det_loader.terminate()
             while(writer.running()):
                 time.sleep(1)
                 print('===========================> Rendering remaining ' + str(writer.count()) + ' images in the queue...', end='\r')
@@ -401,10 +402,10 @@ if __name__ == "__main__":
         else:
             # subprocesses are killed, manually clear queues
 
-            det_loader.terminate()
+            # det_loader.terminate()
             writer.terminate()
             writer.clear_queues()
-            det_loader.clear_queues()
+            # det_loader.clear_queues()
 
 
     

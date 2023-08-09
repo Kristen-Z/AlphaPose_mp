@@ -3,6 +3,7 @@ import argparse
 import os
 import platform
 import sys
+sys.path.append("/users/axing2/data/axing2/hand-pose/AlphaPose_mp") # path to alpha pose directory
 import time
 
 import numpy as np
