@@ -68,7 +68,7 @@ def get_mediapipe_bbox(frame):
     bboxes = []
     scores = []
     with mp_hands.Hands(
-        static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5
+        static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5
     ) as hands:
         bbox = []
         image = cv2.flip(frame, 1)
