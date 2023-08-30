@@ -9,3 +9,4 @@ scipy
 cython_bbox
 pyyaml
 pycocotools
+mediapipe
