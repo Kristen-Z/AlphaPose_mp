@@ -1,0 +1,11 @@
+numpy==1.23.3
+easydict
+cython
+tqdm
+natsort
+opencv-python
+matplotlib
+scipy
+cython_bbox
+pyyaml
+pycocotools
