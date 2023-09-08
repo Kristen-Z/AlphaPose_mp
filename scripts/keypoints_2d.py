@@ -87,6 +87,8 @@ def get_mediapipe_bbox(frame):
             scores.append([0.0])
             return _get_output(bboxes,scores)
 
+        # just appends the score for hand classification since Alpha Pose doesn't use
+        #   bounding box scores for detection
         scores.append([results.multi_handedness[0].classification[0].score])
         if not results.multi_hand_landmarks:
             return torch.tensor([[0,0,0,0]])
@@ -163,7 +165,6 @@ def loop():
         n += 1
 
 # ------------------------------ 2D Key Points ------------------------------ #
-# if __name__ == "__main__":
 def keypoints_2d(ap_args, cfg, pose_model, pose_dataset):
     global args
     args = ap_args

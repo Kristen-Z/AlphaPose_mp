@@ -715,7 +715,7 @@ def write_json(all_results, outputpath, form=None, for_eval=False, outputfile='a
                     json_results_cmu[result['image_id']]={}
                     json_results_cmu[result['image_id']]['version']="AlphaPose v0.3"
                     json_results_cmu[result['image_id']]['people']=[]
-                tmp={'pose_keypoints_2d':[]}
+                tmp={'pose_keypoints_2d':[], 'bbox': result['box']} # saves the bounding boxes
                 result['keypoints'].append((result['keypoints'][15]+result['keypoints'][18])/2)
                 result['keypoints'].append((result['keypoints'][16]+result['keypoints'][19])/2)
                 result['keypoints'].append((result['keypoints'][17]+result['keypoints'][20])/2)
