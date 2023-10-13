@@ -246,7 +246,7 @@ class SimpleTransform(object):
         # generate training targets
         if self._loss_type == 'MSELoss':
             target, target_weight = self._target_generator(joints, self.num_joints)
-        elif 'JointRegression' in self._loss_type:
+        elif 'JointRegression' in self._loss_type or self.num_joints==21:
             target, target_weight = self._integral_target_generator(joints, self.num_joints, inp_h, inp_w)
         elif self._loss_type == 'Combined':
             if self.num_joints == 68:

@@ -12,7 +12,7 @@ import mediapipe as mp
 import cv2
 import natsort
 
-sys.path.append("/users/axing2/data/axing2/hand-pose/AlphaPose_mp")
+sys.path.append("./AlphaPose_mp")
 from detector.apis import get_detector
 from trackers.tracker_api import Tracker
 from trackers import track
@@ -68,7 +68,7 @@ def get_mediapipe_bbox(frame):
     bboxes = []
     scores = []
     with mp_hands.Hands(
-        static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5
+        static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5
     ) as hands:
         bbox = []
         image = cv2.flip(frame, 1)

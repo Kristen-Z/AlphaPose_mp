@@ -3,7 +3,6 @@ import argparse
 import os
 import platform
 import sys
-sys.path.append("/users/axing2/data/axing2/hand-pose/AlphaPose_mp") # path to alpha pose directory
 import time
 
 import numpy as np
@@ -17,6 +16,7 @@ from detector.apis import get_detector
 from trackers.tracker_api import Tracker
 from trackers.tracker_cfg import cfg as tcfg
 from trackers import track
+sys.path.append(".")
 from alphapose.models import builder
 from alphapose.utils.config import update_config
 from alphapose.utils.detector import DetectionLoader
@@ -146,7 +146,7 @@ def get_mediapipe_bbox(frame):
     bboxes = []
     scores = []
     with mp_hands.Hands(
-        static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5
+        static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5
     ) as hands:
         bbox = []
         image = cv2.flip(frame, 1)
@@ -169,9 +169,9 @@ def get_mediapipe_bbox(frame):
         if not results.multi_hand_landmarks:
             return torch.tensor([[0,0,0,0]])
         image_height, image_width, _ = image.shape
-        landmarks = results.multi_hand_landmarks[0].landmark
-        for landmark in landmarks:
-            bbox.append([landmark.x * image_width, landmark.y * image_height])
+        for handLms in results.multi_hand_landmarks:
+            for landmark in handLms.landmark:
+                bbox.append([landmark.x * image_width, landmark.y * image_height])
 
         # Calculate bounding box
         bbox = np.array(bbox)
@@ -270,15 +270,15 @@ if __name__ == "__main__":
         os.makedirs(args.outputpath)
 
     # Load detection loader
-    # if mode == 'webcam':
-    #     det_loader = WebCamDetectionLoader(input_source, get_detector(args), cfg, args)
-    #     det_worker = det_loader.start()
-    # elif mode == 'detfile':
-    #     det_loader = FileDetectionLoader(input_source, cfg, args)
-    #     det_worker = det_loader.start()
-    # else:
-    #     det_loader = DetectionLoader(input_source, get_detector(args), cfg, args, batchSize=args.detbatch, mode=mode, queueSize=args.qsize)
-    #     det_worker = det_loader.start()
+    if mode == 'webcam':
+        det_loader = WebCamDetectionLoader(input_source, get_detector(args), cfg, args)
+        det_worker = det_loader.start()
+    elif mode == 'detfile':
+        det_loader = FileDetectionLoader(input_source, cfg, args)
+        det_worker = det_loader.start()
+    else:
+        det_loader = DetectionLoader(input_source, get_detector(args), cfg, args, batchSize=args.detbatch, mode=mode, queueSize=args.qsize)
+        det_worker = det_loader.start()
 
     # Load pose model
     pose_model = builder.build_sppe(cfg.MODEL, preset_cfg=cfg.DATA_PRESET)
@@ -302,24 +302,24 @@ if __name__ == "__main__":
 
     # Init data writer
     queueSize = 2 if mode == 'webcam' else args.qsize
-    # if args.save_video and mode != 'image':
-    #     from alphapose.utils.writer import DEFAULT_VIDEO_SAVE_OPT as video_save_opt
-    #     if mode == 'video':
-    #         video_save_opt['savepath'] = os.path.join(args.outputpath, 'AlphaPose_' + os.path.basename(input_source))
-    #     else:
-    #         video_save_opt['savepath'] = os.path.join(args.outputpath, 'AlphaPose_webcam' + str(input_source) + '.mp4')
-    #     video_save_opt.update(det_loader.videoinfo)
-    #     writer = DataWriter(cfg, args, save_video=True, video_save_opt=video_save_opt, queueSize=queueSize).start()
-    # else:
-    writer = DataWriter(cfg, args, save_video=False, queueSize=queueSize).start()
+    if args.save_video and mode != 'image':
+        from alphapose.utils.writer import DEFAULT_VIDEO_SAVE_OPT as video_save_opt
+        if mode == 'video':
+            video_save_opt['savepath'] = os.path.join(args.outputpath, 'AlphaPose_' + os.path.basename(input_source))
+        else:
+            video_save_opt['savepath'] = os.path.join(args.outputpath, 'AlphaPose_webcam' + str(input_source) + '.mp4')
+        video_save_opt.update(det_loader.videoinfo)
+        writer = DataWriter(cfg, args, save_video=True, video_save_opt=video_save_opt, queueSize=queueSize).start()
+    else:
+        writer = DataWriter(cfg, args, save_video=False, queueSize=queueSize).start()
 
-    # if mode == 'webcam':
-    #     print('Starting webcam demo, press Ctrl + C to terminate...')
-    #     sys.stdout.flush()
-    #     im_names_desc = tqdm(loop())
-    # else:
-    data_len = len(input_source) # det_loader.length
-    im_names_desc = tqdm(range(data_len), dynamic_ncols=True)
+    if mode == 'webcam':
+        print('Starting webcam demo, press Ctrl + C to terminate...')
+        sys.stdout.flush()
+        im_names_desc = tqdm(loop())
+    else:
+        data_len = det_loader.length
+        im_names_desc = tqdm(range(data_len), dynamic_ncols=True)
 
     batchSize = args.posebatch
     if args.flip:
@@ -328,9 +328,7 @@ if __name__ == "__main__":
         for i in im_names_desc:
             start_time = getTime()
             with torch.no_grad():
-                # (inps, orig_img, im_name, boxes, scores, ids, cropped_boxes) = det_loader.read()
-                im_name = input_source[i]
-                orig_img = cv2.cvtColor(cv2.imread(os.path.join(args.inputpath, im_name)), cv2.COLOR_BGR2RGB)
+                (inps, orig_img, im_name, boxes, scores, ids, cropped_boxes) = det_loader.read()
                 m_inps, m_boxes, m_cropped_boxes, m_scores, m_ids = get_mediapipe_bbox(orig_img)
                 if orig_img is None:
                     break
@@ -340,8 +338,6 @@ if __name__ == "__main__":
                 if args.profile:
                     ckpt_time, det_time = getTime(start_time)
                     runtime_profile['dt'].append(det_time)
-                # Pose Estimation
-                # inps = inps.to(args.device)
                 m_inps = m_inps.to(args.device)
                 datalen = m_inps.size(0)
                 leftover = 0
@@ -385,7 +381,7 @@ if __name__ == "__main__":
             time.sleep(1)
             print('===========================> Rendering remaining ' + str(writer.count()) + ' images in the queue...', end='\r')
         writer.stop()
-        # det_loader.stop()
+        det_loader.stop()
     except Exception as e:
         print(repr(e))
         print('An error as above occurs when processing the images, please check it')
@@ -394,7 +390,7 @@ if __name__ == "__main__":
         print_finish_info()
         # Thread won't be killed when press Ctrl+C
         if args.sp:
-            # det_loader.terminate()
+            det_loader.terminate()
             while(writer.running()):
                 time.sleep(1)
                 print('===========================> Rendering remaining ' + str(writer.count()) + ' images in the queue...', end='\r')
@@ -402,11 +398,10 @@ if __name__ == "__main__":
         else:
             # subprocesses are killed, manually clear queues
 
-            # det_loader.terminate()
+            det_loader.terminate()
             writer.terminate()
             writer.clear_queues()
-            # det_loader.clear_queues()
+            det_loader.clear_queues()
 
 
     
-

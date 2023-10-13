@@ -660,6 +660,7 @@ def write_json(all_results, outputpath, form=None, for_eval=False, outputfile='a
     all_result: result dict of predictions
     outputpath: output directory
     '''
+    
     json_results = []
     json_results_cmu = {}
     for im_res in all_results:

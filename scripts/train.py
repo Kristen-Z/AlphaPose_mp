@@ -75,8 +75,8 @@ def train(opt, train_loader, m, criterion, optimizer, writer):
             loss_face_hand = criterion[1](output_face_hand, labels_face_hand, label_masks_face_hand)
             acc_face_hand = calc_integral_accuracy(output_face_hand, labels_face_hand, label_masks_face_hand, output_3d=False, norm_type=norm_type)
 
-            loss_body_foot *= 100
-            loss_face_hand *= 0.01
+            loss_body_foot *= 10
+            loss_face_hand *= 10
 
             loss = loss_body_foot + loss_face_hand
             acc = acc_body_foot * num_body_foot / (num_body_foot + num_face_hand) + acc_face_hand * num_face_hand / (num_body_foot + num_face_hand)
@@ -120,7 +120,7 @@ def train(opt, train_loader, m, criterion, optimizer, writer):
 def validate(m, opt, heatmap_to_coord, batch_size=20):
     det_dataset = builder.build_dataset(cfg.DATASET.TEST, preset_cfg=cfg.DATA_PRESET, train=False, opt=opt)
     det_loader = torch.utils.data.DataLoader(
-        det_dataset, batch_size=batch_size, shuffle=False, num_workers=20, drop_last=False)
+        det_dataset, batch_size=batch_size, shuffle=False, num_workers=8, drop_last=False)
     kpt_json = []
     eval_joints = det_dataset.EVAL_JOINTS
 
@@ -158,8 +158,8 @@ def validate(m, opt, heatmap_to_coord, batch_size=20):
                 pose_coords = np.concatenate((pose_coords_body_foot, pose_coords_face_hand), axis=0)
                 pose_scores = np.concatenate((pose_scores_body_foot, pose_scores_face_hand), axis=0)
             else:
-                pose_coords, pose_scores = heatmap_to_coord(
-                    pred[i][det_dataset.EVAL_JOINTS], bbox, hm_shape=hm_size, norm_type=norm_type)
+               
+                pose_coords, pose_scores = heatmap_to_coord(pred[i][det_dataset.EVAL_JOINTS], bbox, hm_shape=hm_size, norm_type=norm_type)
 
             keypoints = np.concatenate((pose_coords, pose_scores), axis=1)
             keypoints = keypoints.reshape(-1).tolist()
@@ -186,7 +186,7 @@ def validate_gt(m, opt, cfg, heatmap_to_coord, batch_size=20):
     eval_joints = gt_val_dataset.EVAL_JOINTS
 
     gt_val_loader = torch.utils.data.DataLoader(
-        gt_val_dataset, batch_size=batch_size, shuffle=False, num_workers=20, drop_last=False)
+        gt_val_dataset, batch_size=batch_size, shuffle=False, num_workers=8, drop_last=False)
     kpt_json = []
     m.eval()
 
@@ -214,7 +214,7 @@ def validate_gt(m, opt, cfg, heatmap_to_coord, batch_size=20):
 
         for i in range(output.shape[0]):
             bbox = bboxes[i].tolist()
-            if combined_loss:
+            if combined_loss and gt_val_dataset.num_joints!=21:
                 pose_coords_body_foot, pose_scores_body_foot = heatmap_to_coord[0](
                     pred[i][gt_val_dataset.EVAL_JOINTS[:-face_hand_num]], bbox, hm_shape=hm_size, norm_type=norm_type)
                 pose_coords_face_hand, pose_scores_face_hand = heatmap_to_coord[1](
@@ -222,8 +222,8 @@ def validate_gt(m, opt, cfg, heatmap_to_coord, batch_size=20):
                 pose_coords = np.concatenate((pose_coords_body_foot, pose_coords_face_hand), axis=0)
                 pose_scores = np.concatenate((pose_scores_body_foot, pose_scores_face_hand), axis=0)
             else:
-                pose_coords, pose_scores = heatmap_to_coord(
-                    pred[i][gt_val_dataset.EVAL_JOINTS], bbox, hm_shape=hm_size, norm_type=norm_type)
+                #print(pred[i].shape,gt_val_dataset.EVAL_JOINTS)
+                pose_coords, pose_scores = heatmap_to_coord(pred[i][gt_val_dataset.EVAL_JOINTS], bbox, hm_shape=hm_size, norm_type=norm_type)
 
             keypoints = np.concatenate((pose_coords, pose_scores), axis=1)
             keypoints = keypoints.reshape(-1).tolist()
